@@ -1,0 +1,726 @@
+---
+title: "Demonetisation and digital payments"
+author: "Jammi N Rao"
+date: "6 November 2018"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+  fontsize: 12pt
+  word_document: default
+---
+
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+library(tidyverse)
+library(ggfortify)
+library(forecast)
+library(ggthemes)
+library(cowplot)
+
+# set up theme for plotting
+theme_study1 <- theme_economist() +
+  theme(
+    rect = element_rect(fill = "#F9F5F1"),
+    plot.background = element_rect(fill = "#F9F5F1"),
+    strip.background.y = element_rect(fill = "#857670"),
+    strip.text = element_text(colour ="white"),
+    panel.grid.major.x = element_line(colour = "white"),
+    axis.text = element_text(size = rel(1.2)),
+    plot.title = element_text(size = rel(1.4)),
+    plot.subtitle = element_text(size = rel(1.2)),
+    axis.title = element_text(size = rel(1.2)),
+    plot.caption = element_text(size = rel(1.2)) 
+  )
+
+# load the data
+rbi <- read.csv("RBIPaymentsystemstoMonthAug2018_cleanedupdata.csv", 
+                header=TRUE, stringsAsFactors = FALSE)
+
+## strip out all the commas
+f <- function(x){as.numeric(gsub(",","",x))} # replaces "," with empty char in a vector
+rbi.2 <- data.frame(apply(rbi[,2:ncol(rbi)], 2, f)) 
+rbi <- cbind(rbi[,1], rbi.2)
+colnames(rbi)[1] <- "Month"
+rbi <- rbi[nrow(rbi):1, ] # reverses the order so it is chronologically forward
+
+```
+
+## Did India's Demonetisation of 8 Nov. 2016 boost uptake of digital payments systems  
+
+### An analysis of data from the Reserve Bank of India
+  
+    
+      
+        
+          
+            
+              
+              
+
+
+\newpage
+## Abstract  
+
+On Nov 8 2016 at about 8 pm, the Prime Minister of India announced that effective midnight that day  the existing stck of Rupee 500 and 1000 notes would cease to be legal tender. This policy came to be known as India's Demonetisation. These two denominations of currency notes made up 86% of the currency notes in circulation.  
+
+Though not mentioned as an objective of the policy initially, one of the benefits claimed for it at  a later date was a significant shift away from payments using paper money and towards digital payments. 
+
+Two years on from Nov 2016 it is germane to ask, 'Did digital payents really take off?'  
+
+In this analysis I use a time series analysis forecasting approach applied to monthly data from RBI on the volume, and the total value, of financial transactions by each of several different digital payments systems. 
+
+Taking the data upto October 2016 (the month before demonetisation) and using Autoregressive Integrated Moving Average (ARIMA) modelling to forecast future growth, I show that the actual growth observed in the months after Nov 2016 was mostly within the expected range of the forecast levels.
+
+My analysis shows that any growth in the volume of of digital payments post-demonetisation can be explained almost completely on the basis of trend growth. Digital payments were growing before Nov 2016 and they continued to grow post-demonetisation at about the same rate. There is little direct evidence of any causal effect of demonetisation that was either long term or sustained.  
+
+\newpage
+
+
+## Source and description of data 
+The data for this analysis come from publicly available data in the [Database of Indian Economy](https://dbie.rbi.org.in/DBIE/dbie.rbi?site=home) published on its website by the [Reserve Bank of India](https://www.rbi.org.in/). Specifically, the time series data on Payment Systems Indicators records for each month the total volume (i.e. number of transactions in millions), and the total value of the transactions (in billions of rupees) for each of the non cash payments systems in use. 
+
+A screen shot of the data is attached in Appendix 1.
+
+The payment systems indicators that I downloaded are:
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+colnames(rbi)
+```
+
+The other data in the RBI database are subsets of these; for instance RTGS data is broken down into Customer transactions, Interbankl transactions and others. I have restricted my analysis to the total for selected modalities of payment. 
+
+## Analytical methods
+
+Each column of the data set can be seen as a time series at regular monthly intervals. If a time-series is stationary or can be transformed into a stationary time-series by suitable transformation, it can be modelled using statistical regression. Such regression breaks down the perioic variation or noise into a smooth trend component, a seasonal component and what is left is a residual unexplained variation. The parameters of the regression equation allows the time series to be forecast into the future  for any given number of periods, to generate an expected value at each time period and, because of the residual component, an 80% or 95% upper and lower confidence interval.
+
+This is standard time series analysis, and the [statistical programme R](https://www.R-project.org/) provides some powerful tools for the purpose. Keen readers should see the [monograph by Rob J Hyndman](https://otexts.org/fpp2/)
+
+I used the R package 'forecast' to carry out the ARIMA analysis and the R package 'ggplot2' to generate the charts.
+
+## Analysis and Results 
+
+### The analytical steps
+I illustrate the steps in the analysis using the mobile banking payment systems indicator as a template before repeating the same analysis for the following indicators:  
+
+1. Digital Grand Total by value
+2. Digital Grand Total by volume
+3. All cards by value
+4. All cards by volume
+5. Retail sales by value
+6. retail sales by volume
+7. RTGS payments by value
+8. RTGS payments by volume
+
+### Mobile  payments by value
+
+Chart 1 shows the raw data in a standard time series chart. I have partitioned the data into a pre and post Nov 2016 series to show the effect of DeMonetisation. The indicator was rising steeply from 2016 onward, post demonetisation there was an acute spurt upward that was not sustained. By mid 2017 it had fallen back to levels seen a year earlier. Since then there has been a steady rise with the slope about the same as 2 years earlier. 
+
+
+```{r "Chart1", echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+d <- ts(rbi[121:173,]$mBanking_val, frequency = 12, start=c(2014,4)) ## vector of values for mBanking_val
+## conv into a ts object 
+#tail(d)
+d.pre <- window(d,start = c(2014, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+
+#tail(d.pre)
+
+#autoplot(d)
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+raw.data.plot <- ggplot(data = p1$data, aes(x=x, y=y)) +
+    geom_line(colour = "#004500") + 
+    geom_line(data = p2$data, aes(x=x, y=y), colour = "#D55E00", size = 0.8) +
+    theme_study1 +
+    scale_x_continuous(breaks = c(2014,2015,2016, 2017,2018, 2019),
+                       labels = c("2014", "2015", "2016", "2017", "2018", "2019"))+
+    #scale_y_continuous(breaks = c(50000, 100000,150000,200000,250000,300000),
+    #labels = c("50k", "100k", "150k", "200k", "250k", "300k"))+
+    labs(title = "Chart 1. Mobile Banking payments - billions of rupees",
+         subtitle = "Monthly data April 2014 to Aug 2018. Demonetisation occurred on 8 Nov 2016 \ndenoted by the change in colour",
+         caption = "Data Source:https://dbie.rbi.org.in/DBIE/dbie.rbi?site=home,  \naccessed on 31 Oct 2018", 
+         x ="Months", y ="Billions of Rupees")
+
+raw.data.plot
+
+```
+
+\newpage
+The key question is this: using just the data we had pre Nov 2016 what would be have predicted for, say April to Aug 2018? First we need to establish that this time series - i.e the data from April 2014 to Oct 2016 - is capable of being made stationary, i.e we need to understand the trend, seasonal and residual components of the data series. This partitioning of the variability is shown in Chart 2
+
+```{r "Chart 2",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE }
+decompose.plot <- 
+  d.pre %>%
+    decompose(type = "additive") %>%
+    autoplot(facet = TRUE, main ="", xlab = NULL,
+             ylab = NULL) + 
+  theme_study1
+decompose.plot <- decompose.plot + labs(caption = "Data Source: https://goo.gl/18RfVS,  accessed on 05 Aug 2018 
+                   data analysis and charts in R (https://www.R-project.org/) and ggplot2 (http://ggplot2.org) 
+                      ?JayEnAar, @GorwayGlobal",
+                      title = "Chart 2. Trend, seasonal and remainder components of the data"
+  
+)
+decompose.plot
+
+```
+
+Now we can use the forecast package in R to use this data to forecast the future. Note that for the purposes of this 'thought experiment' we act as if we are in Nov 2016; the only data we have are upto Oct 2016 and we ask ourselves, 'What is the best prediction we can make how mobile banking payments will grow over the next 22 months - to Aug 2018. We then overlay the data that have infact observed and see if what we have observed was 'predictable' back in Nov 2016.  
+
+\newpage
+Chart 3 shows the result of this analysis. The white line is the mean of the predicted values of the indicator, the shaded areas on either side are the 80 and 95% confidence bands, and the red line is the actual observed values of the indicator.  
+
+As can be seen the values observed are well within, indeed more recently they are slightly lower than waht we might have predicted in Nov 2016. I believe this is strong evidence of the lack of any appreciable effect of DeMonetisation on the value of mobile payments. They are higher than they were in late 2016, but then they have been growing steadily since 2014 and any growth post DeMonetisation is merely part of trend growth
+
+
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide" }
+d.pre %>%
+    sqrt() %>%
+    diff(12) %>%
+    diff() #%>% 
+    #autoplot()
+```
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+
+```
+
+```{r "Chart 3",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = c(2014,2015,2016,2017, 2018),
+                     labels = c("2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = " Billions of Rupees",
+                      breaks = c(500, 1000,2000, 3000, 4000, 5000, 6000),
+                     labels = c("500", "1K", "2K", "3K", "4K", "5K", "6K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 3. Predicted mobile payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+## Analysis and results of other payment system indicators
+
+For the subsequent indicators, I present just the final plot of the forecast together with the actual data observed to draw a conclusion whether there was a change that was outside the range of statistically predictable values.
+
+
+### Mobile banking payments by volume  
+
+Chart 4 shows a dramatic rise in volume of mBanking transactions. It was clearly in excess of anything that could have been predicted in Nov 2016 using the data available up that point. 
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[121:173,]$mBanking_vol, frequency = 12, start=c(2014,4)) ## vector of values for mBanking_val
+## conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2014, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 4",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = c(2014,2015,2016,2017, 2018),
+                     labels = c("2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = " Millions transactions",
+                      breaks = c(50, 100,200, 300, 400),
+                     labels = c("50", "100", "200", "300", "400")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 4. Predicted mBanking transactions from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+Chart 4 (mBanking volume) is in sharp contrast to Chart 3 (mBanking value). It would appear that whereas the total value of transactions done each month using mBanking has gone up in keeping with the pre Nov 2016 trend, the number of such transactions has gone up well beyond trend growth. This would suggest that the average value per transaction has fallen back sharply at some point after Demonetisation. 
+
+\newpage
+## Average spend per transaction in mBanking payments  
+
+Chart 5 shows precisely this trend. I have not done any predictive modelling here, the chart shows tells its own story. Clearly, the average size of mobile Banking transaction rose briefly above 15,000 Rupees but then fell back rapidly over 2017 to levels of just over 5,000 Rupees that were last seen in early 2015. Possible reasons for this could be a backlash against charges for remittances and payments using mobile based payment services.  
+. 
+
+```{r "Chart 5",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+avg.mbank.plot  <- rbi %>% 
+    mutate(avg.trans = 1000 *(mBanking_val/mBanking_vol)) %>%
+    select(avg.trans) %>%
+    filter(!(is.na(avg.trans))) %>%
+    ts(frequency = 12, start = c(2011,4)) %>%
+    window(start=c(2014,4)) %>%
+    autoplot()
+avg.mbank.plot <- avg.mbank.plot +
+    scale_x_continuous( name="",
+                      breaks = c(2014,2015,2016,2017, 2018),
+                     labels = c("2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = "Average value of transaction, Rupees",
+                      breaks = c(5000, 10000,15000),
+                     labels = c("5K", "10K", "15K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 5. mBanking payments - average size of transaction",
+       subtitle = "",
+       caption = "©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+avg.mbank.plot
+```
+
+\newpage
+### Total digital transactions by value
+
+Total Digital Payments is perhaps the most pertinent indicator to track. This indicator is the sum of the following indicators:
+
+- 1.1 Customer transactions through Real-Time Gross Settlements (RTGS)
+- 1.2 Inter-bank RTGS transactions
+- 2 CCIL operated payments systems
+- 3 Paper Clearing
+- 4 Retail Electronic Clearing
+- 5 Card Payments (debit and credit cards)
+- 6 Pre-paid Payments Instruments (includes m-Wallet, PPI cards and Paper Vouchers)
+
+Chart 6 shows that total digital transactions have been steadily growing throughtout the period 2004 to 2018. This growth has continued after DeMonetisation in Nov 2016 but this has been trend growth. The post Non 2016 growth is within the range that could have been predicted before DeMonetisation by statistical modelling using the data available at that point.
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[13:173, ]$DigitalGrandTotal_val, frequency = 12, start=c(2005,4)) ## vector of values for Total digital                             ##transactions conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2005, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 6",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2005, 2018, 2),
+                     labels = c("2005", "2007","2009", "2011", "2013","2015", "2017")) +
+  scale_y_continuous( name = " Billions of Rupees",
+                      breaks = c(50000, 100000, 150000, 200000, 250000),
+                     labels = c("50k", "100K", "150K", "200K","250K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 6. Predicted Total digital payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### Total digital transactions by volume
+
+Chart 7 shows that the volume of transactions included in the Total digital payments indicator rose sharply immediately after Demonetisation and after some moderation continued over the next 22 months to be just above the 95% upper confidence limit of the range that might have been predicted in late 2016 based on the data then available.  
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[13:173, ]$DigitalGrantTotal_vol, frequency = 12, start=c(2005,4)) ## vector of values for Total digital                             ##transactions conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2005, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 7",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2005, 2018, 2),
+                     labels = c("2005", "2007","2009", "2011", "2013","2015", "2017")) +
+  scale_y_continuous( name = "Millions of transactions",
+                      breaks = c(1000, 1500, 2000, 2500),
+                     labels = c("1K","1.5K","2K","2.5K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 7. Predicted Total digital transactions from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### Plastic card payments by value
+
+Chart 8 shows that the value of transactions made using Plastic cards after DeMonetisations is above the range that could have been predicted in Nov 2016  based on the trend data then available. But this finding needs to be seen in the context of the known pattern of debit card usage in India. Predominantly it is used to draw cash at ATMs. See later 
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[85:173, ]$AllCards_val, frequency = 12, start=c(2011,4)) ## vector of values for Total digital                             ##transactions conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2011, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 8",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2011, 2018, 1),
+                     labels = c("2011","2012", "2013","2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = "Billion of Rupees",
+                      breaks = c(1000, 1500, 2000, 2500, 3000, 3500),
+                     labels = c("1K","1.5K","2K","2.5K", "3k", "3.5K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 8. Predicted plastic card payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### Plastic cards transaction volumes
+
+Chart 9 shows that the growth in number of transactions using plastic cards (debit and credit cards) has been steady but unspecatcular. The growth in the period since DeMonetisation is in the middle of the range of values that could have been predicted in Nov 2016 based on statistical modelling of the data available at the time. 
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[85:173, ]$AllCards_vol, frequency = 12, start=c(2011,4)) ## vector of values for Total digital                             ##transactions conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2011, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 9",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2011, 2018, 1),
+                     labels = c("2011","2012", "2013","2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = "Millions of transactions",
+                      breaks = c(500, 700, 900,1100, 1300),
+                     labels = c("500","700", "900", "1100", "1300")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 9. Predicted plastic card transactions from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+Charts 8 and 9 need to be interpreted in light of known patterns of of card use in India. Debit cards are widely held. As of August 2018, Indians held 980 million debit cards but only 41 million credit cards. Debit cards are used in the main to draw cash out of ATMs. In August 2018, debit cards were used 805 million times in an ATM (with an average transaction amount of INR 3,400); and 357 million times at a Point of Sale terminal (with an average transaction amount of INR 1370). 
+
+Credit cards are relatively predominantly at POS terminals (144 million transaction in August 2018, vs 0.8 million times at an ATM). For the detailed data on [debit and credit card usage see](https://www.rbi.org.in/Scripts/ATMView.aspx) 
+
+
+\newpage
+### Immediate Payment Service (IMPS) payments
+
+Chart 10 shows the trend growth in the total value of payments made using IMPS - the Immediate Payments Service. The growth in the period after DeMonetisation has been a continuation of the trend prior to that event. The actual growth observed is just above the predicted line but well within the 80% confidence range.  
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[121:173, ]$IMPS_val, frequency = 12, start=c(2014,4)) ## vector of values for Immediate Payments service conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2014, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 10",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2014, 2018, 1),
+                     labels = c("2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = "Billions of Rupees",
+                      breaks = seq(0,1200, 200),
+                     labels = c("","200", "400", "600", "800", "1000", "1200")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 10. IMPS payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### IMPS Payments transaction volumes
+
+Chart 11 shows the trend growth in the volume of transactions settled using IMPS - the Immediate Payments Service. The growth in the period after DeMonetisation has been a continuation of the trend prior to that event. The actual growth observed is just above the predictyion line but well within the 80% confidence range.  
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi[121:173, ]$IMPS_vol, frequency = 12, start=c(2014,4)) ## vector of values for Immediate Payments service conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2014, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 11",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2014, 2018, 1),
+                     labels = c("2014", "2015", "2016", "2017", "2018")) +
+  scale_y_continuous( name = "Millions of transactions",
+                      breaks = seq(0,120, 20),
+                     labels = c("","20", "40", "60", "80", "100", "120")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 11. IMPS payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### RTGS payments by value
+
+Real Time Gross settlements are used for payments over INR 2 Lacs.  
+
+Chart 12 shows the predicted trend in growth using ARIMA modelling and the observed growth. After Demonetisation growth in RTGS payment volumes has continued largely on predictable trend.It fluctuates quite a bit (for example see the spike in 2012) but the observed numbers post-DeMonetsiation has stayed mostly with in the 80% confidence band, occasionally going above it but still within the 95% confidence band. 
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi$RTGS_val, frequency = 12, start=c(2004,4)) ## vector of values for Immediate Payments service conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2004, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 12",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2004, 2018, 2),
+                     labels = c("2004","2006","2008","2010","2012", "2014", "2016","2018")) +
+  scale_y_continuous( name = "Billions of Rupees",
+                      breaks = seq(25000, 150000, 25000),
+                     labels = c("25K","50K","75K","100K","125K","150K")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 12. RTGS payments from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+### RTGS payments by volume
+Chart 13 shows that the volume of transactions using the RTGS payments system has continued to grow. The growth after Demonetisation has been within the 95% range that could have been predicted in Nov 2016 using ARIMA modelling of the data available upto that date. 
+
+```{r echo=FALSE, message=FALSE, error=FALSE, warning=FALSE, results="hide"}
+d <- ts(rbi$RTGS_vol, frequency = 12, start=c(2004,4)) ## vector of values for Immediate Payments service conv into a ts object 
+#tail(d)
+# plot(d)
+d.pre <- window(d,start = c(2004, 04),end = c(2016,10)) ## the series upto Oct 2016 i.e pre demon)
+d.post <- window(d, start=c(2016,11))
+p1 <- autoplot(d.pre, ts.colour = "#999999")
+p2 <- autoplot(d.post)
+
+d.model <-  d.pre %>%
+  auto.arima(stepwise = FALSE, 
+             approximation = TRUE, 
+             #lambda ="auto", 
+             trace = TRUE)
+auto.arima(d.pre)
+
+```
+
+```{r "Chart 13",echo=FALSE, message=FALSE, error=FALSE, warning=FALSE}
+model.plot <- d.model %>% 
+  forecast(h=22, robust = TRUE) %>%
+  autoplot(main="", shadecols = c("#8B5B38", "#CFB292"), 
+                      fcol = "white")
+model.plot <- model.plot + 
+  geom_line(data=p2$data, aes(x=x, y=y), colour = "red", size = 0.8) +
+  scale_x_continuous( name="",
+                      breaks = seq(2004, 2018, 2),
+                     labels = c("2004","2006","2008","2010","2012", "2014", "2016","2018")) +
+  scale_y_continuous( name = "Millions of Transactions",
+                      breaks = seq(0, 12, 2),
+                     labels = c("", "2","4","6","8","10","12")) +
+  theme(legend.position = "left" )+
+  labs(title = "Chart 13. RTGS transaction volumes from ARIMA model",
+       subtitle = "Shaded area represents 80% and 95% confidence interval of prediction",
+       caption = "prediction with 'forecast' package, (http://pkg.robjhyndman.com/forecast) \n ©JayEnAar, ©GorwayGlobal")+
+  theme_study1
+
+model.plot
+
+```
+
+\newpage
+## Summary of results
+ARIMA modelling of the time series data upto October 2016 - the month before DeMonetisation - shows that for most of the digital payments systems indicators, the growth in the 22 months following (November 2016 to August 2018, the latest month for which RBI has published data) has been 'on trend'. 
+
+## Discussion
+[Newspaper reports](https://www.businesstoday.in/money/banking/demonetisation-digital-payments-cashless-transactions-ewallets-credit-card-debit-card-paytm/story/263466.html) as well as a [research paper by Maiti SS](https://www.rbi.org.in/Scripts/MSM_Mintstreetmemos7.aspx) of RBI suggest that there has indeed been a shift from cash and paper based systems to digital payments. These reports were based on analysis comparing the value of digital transactions a few months after Demonetisation with corresponding values before that event.   
+
+This approach is almost certaionly flawed because it does not take into account the fact that as India's economy grows and as financial technology and the necessary digital infrastructure spreads the uptake of digital payment systems grows organically. Any increase over a period of time cannot confidently be causally attributed to a specific one-off policy intervention with any degree of certainty.
+
+Ascribing causality is always fraught. The danger is that those who espouse a particular policy or  defend a policy move by 'their hero' will have a natural inclination to pluck selectively at data before and after the policy to show that a change has occurred. But we need contantly top be aware of the well known logical fallacy known as the 'post hoc ergo propter hoc' fallacy. Translated from Latin it means 'After this therefore because of this'. Just because event B occurs at some point in time after A, it does not follow that A caused B. To be able to show that A caused B, one would have to show convincingly that B would not have occured had it not been for A. 
+
+In the case of economic data like payments systems indicators there is steady chage (usually growth, but sometimes also decay) over time, and there is fluctuation from one period to the next. By selectively choosing time point one could make whatever argument one wishes to. Therefore, with time series data the best and most rational approach is to consider the whole data set an look for patterns. 
+
+Time series analysis is now a well developed technique. A time series can be modelled using standard statistical regression techniques and, just as with any other regression model, the model parameters can be used to 'predict' how it will pan out into the future. I use the word 'predict' within quotes to make the obvious point that this is not prediction in the astrological or tea-leaf reading sense but rather statistical prediction. As with all statistical prediction, there is a mean expectation and surrounding it one can set up a range within which the observed actual values can be expected to land with a given degree of confidence. 
+
+My appriach in this analysis has been in the nature of a thought experiment. If we were back in time in early Nov 2016, when the Demonetisation that happened on 8 Nov was not on anyone's horizon, and we looked at the RBI data set on payments system indicators, ans asked ourselves this question: "Given this data where do we think the numbers will be 15 months to 22 months later?".
+
+My analysis shows that what really happened - the actual observed data - was foer the most part within the range that we might have predicted. 
+
+Demonetisation can be credited for at most a marginal effect on one or two digital payment systems indicators - namely, a) the number of mobile payments, though not on the total value of them,  
+b) the number of total digital transactions, but again not on the total value of them,  
+c) the value of platic card transactions but not on their number, but note here the predominant use of debit cards in India is to draw cash at ATMs.
+
+But these account for relatively small amounts of money. The big ticket items are RTGS, and IMPS and here boith the numbers of transactions and the total value are within the range that could have been predicted back in Oct 2016 with the data then available.
+
+## Conclusion
+
+Demonetisation cannot be claimed to have led to a change in the use of digital means of payments as opposed to cash. 
+
+
+\newpage
+## Appendices
+
+### Appendix 1
+Screenshot of RBI's webpage showing the top few rows and columns of the payment systems data set.
+
+![](docs/screenshotRBIdatabase.png)
+
